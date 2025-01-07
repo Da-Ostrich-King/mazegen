@@ -1,10 +1,14 @@
 
-
+#ifdef __unix__
 #include <raylib.h>
+#elif defined(_WIN32) || defined(WIN32)
+#include "raylib.h"
+#endif
 
 #include <cstddef>
 #include <cstdint>
 
+#include <iostream>
 #include <random>
 #include <utility>
 
@@ -34,11 +38,11 @@ int main( int argc, char** argv, char** envv ) {
     /*
     * coordinate plane is graphics standard, ( +y is down, origin is top left), not cartesian standard ( +y is up, origin is center)
     */
-    std::vector< std::vector< uint_least8_t > > maze; // 0 means not part of maze, 1 means part of maze but not path, 2 means part of maze path. outer vec is the x coord inner vec is y coord
-    maze.resize( size_x );
-    for ( auto row : maze ) {
-        row.resize( size_y );
-    }
+    std::vector< std::vector< uint_least8_t > > maze( size_x, std::vector< uint_least8_t >( ( uint_least8_t ) size_y ) ); // 0 means not part of maze, 1 means part of maze but not path, 2 means part of maze path. outer vec is the x coord inner vec is y coord
+    // maze.resize( size_x );
+    // for ( auto row : maze ) {
+    //     row.resize( size_y );
+    // }
 
     int init_x = randRangeX( randengine );
     int init_y = randRangeY( randengine );
@@ -71,8 +75,10 @@ int main( int argc, char** argv, char** envv ) {
 
     InitWindow( size_x * scale, size_y * scale, "Maze Generator" );
 
-    BeginDrawing();
 
+    /*
+    * Actual algorithm begins here
+    */
 
     while ( finishedCells != size_x * size_y ) {
         std::vector< std::pair< int, int > > loop;
@@ -84,16 +90,33 @@ int main( int argc, char** argv, char** envv ) {
         bool finished = false;
         std::uniform_int_distribution< int > randRangeDirection( 0, 3 );
         while ( !finished ) {
-            std::pair< int, int > newPos( loop[ loop.size() ] );
+            std::pair< int, int > newPos( loop[ loop.size() - 1 ] );
             
+            BeginDrawing();
+            ClearBackground( BLACK );
+            std::cerr << "Drawing frame\n";
+            for ( int i = 0; i < size_x; i++ ) {
+                for ( int j = 0; j < size_y; j++ ) {
+                    DrawRectangle( i * scale, j * scale, scale, scale, maze[ i ][ j ] == 2 ? WHITE : BLACK);
+                }
+            }
+            for ( int i = 0; i < loop.size(); i++ ) {
+                DrawRectangle( loop[ i ].first * scale, loop[ i ].second * scale, scale, scale, PINK );
+            }
+            std::cout << "Drawn frame\n";
+            EndDrawing();
+
+
             // check if maze pos is equal to 1 (wall)
 
             if ( maze[ newPos.first ][ newPos.second ] == 1 ) {
+                std::cerr << "Hit wall process start\n";
                 for ( int i = 0; i < loop.size(); i++ ) {
+                    std::cerr << "Hit wall process loop\n";
                     maze[ loop[ i ].first ][ loop[ i ].second ] = 2;
 
                     /*
-                    * set walls to all positions around the path
+                    * set all positions around the path to wall
                     */
 
                     if ( loop[ i ].first != 0 ) {
@@ -137,7 +160,8 @@ int main( int argc, char** argv, char** envv ) {
                         }
                     }
                 } // iter over `loop` and set maze values
-
+                std::cerr << "Hit wall process done\n";
+                finished = true;
 
             }
 
@@ -145,6 +169,7 @@ int main( int argc, char** argv, char** envv ) {
             * Random walk part
             */
             while ( true ) { // manual break
+                std::cerr << "Bounds checking\n";
                 int direction = randRangeDirection( randengine ); // 0-3, 0 is +y, 1 is +x, 2 is -y, 3 is -x (ccw)
                 switch ( direction ) {
                 case 0:
@@ -181,7 +206,7 @@ int main( int argc, char** argv, char** envv ) {
             /*
             * Loop erased part
             */
-            for ( int i = 0; i < loop.size(); i++ ) {
+            for ( int i = 0; i < loop.size() - 1; i++ ) {
                 if ( loop[ i ] == newPos ) { 
                     loop.resize( i + 1 );
                     newPos = loop[ i ];
@@ -190,8 +215,13 @@ int main( int argc, char** argv, char** envv ) {
             
         }
     }
-
-    EndDrawing();
+    for ( int i = 0; i < size_x; i++ ) {
+        std::cout << "[ ";
+        for ( int j = 0; j < size_y; j++ ) {
+            std::cout << maze[ i ][ j ] << ", "; 
+        }
+        std::cout << "]\n";
+    }
 
     while ( !WindowShouldClose() );
 
